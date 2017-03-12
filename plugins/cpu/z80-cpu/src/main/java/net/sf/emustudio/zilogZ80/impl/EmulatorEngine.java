@@ -79,8 +79,8 @@ public class EmulatorEngine implements CpuEngine {
 
     public final int[] regs = new int[8];
     public final int[] regs2 = new int[8];
-    public volatile int flags = 2;
-    public volatile int  flags2 = 2;    
+    public int flags = 2;
+    public int flags2 = 2;    
     
     // special registers
     public int PC = 0, SP = 0, IX = 0, IY = 0;
@@ -101,7 +101,6 @@ public class EmulatorEngine implements CpuEngine {
     private DeviceContext interruptDevice;
 
     private RunState currentRunState = RunState.STATE_STOPPED_NORMAL;
-    public int checkTimeSlice = 100;
     private long executedCycles = 0;
 
     private volatile DispatchListener dispatchListener;
@@ -138,7 +137,7 @@ public class EmulatorEngine implements CpuEngine {
         }
     }
 
-    public void reset(int startPos) {
+    void reset(int startPos) {
         SP = IX = IY = 0;
         I = R = 0;
         Arrays.fill(regs, 0);
@@ -153,7 +152,7 @@ public class EmulatorEngine implements CpuEngine {
         currentRunState = RunState.STATE_STOPPED_BREAK;
     }
 
-    public CPU.RunState step() throws Exception {
+    CPU.RunState step() throws Exception {
         boolean oldIFF = IFF[0];
         noWait = false;
         currentRunState = CPU.RunState.STATE_STOPPED_BREAK;
@@ -171,6 +170,7 @@ public class EmulatorEngine implements CpuEngine {
     public CPU.RunState run(CPU cpu) {
         long startTime, endTime;
         int cycles_executed;
+        int checkTimeSlice = 100;
         int cycles_to_execute = checkTimeSlice * context.getCPUFrequency();
         int cycles;
         long slice = checkTimeSlice * 1000000;
@@ -212,18 +212,18 @@ public class EmulatorEngine implements CpuEngine {
         return currentRunState;
     }
 
-    public void setInterrupt(DeviceContext device, int mask) {
+    void setInterrupt(DeviceContext device, int mask) {
         this.interruptDevice = device;
         this.interruptPending |= mask;
     }
 
-    public void clearInterrupt(DeviceContext device, int mask) {
+    void clearInterrupt(DeviceContext device, int mask) {
         if (interruptDevice == device) {
             this.interruptPending &= ~mask;
         }
     }
 
-    public void setInterruptVector(byte[] vector) {
+    void setInterruptVector(byte[] vector) {
         if ((vector == null) || (vector.length == 0)) {
             return;
         }
@@ -258,7 +258,7 @@ public class EmulatorEngine implements CpuEngine {
         }
     }
 
-    void putpair(int reg, int val, boolean reg3IsSP) {
+    private void putpair(int reg, int val, boolean reg3IsSP) {
         int high = (val >>> 8) & 0xFF;
         int low = val & 0xFF;
         int index = reg * 2;
@@ -910,8 +910,8 @@ public class EmulatorEngine implements CpuEngine {
     }
 
     private int RST_P(short OP) {
-        writeWord(SP - 2, PC);
         SP = (SP - 2) & 0xffff;
+        writeWord(SP, PC);
         PC = OP & 0x38;
         return 11;
     }
@@ -1144,7 +1144,7 @@ public class EmulatorEngine implements CpuEngine {
 
     private int C9_RET(short OP) {
         PC = readWord(SP);
-        SP += 2;
+        SP = (SP + 2) & 0xFFFF;
         return 10;
     }
 
@@ -1172,9 +1172,10 @@ public class EmulatorEngine implements CpuEngine {
 
     private int E3_EX_LPAR_SP_RPAR_HL(short OP) {
         int tmp = memory.read(SP);
-        int tmp1 = memory.read(SP + 1);
+        int x = (SP + 1) & 0xFFFF;
+        int tmp1 = memory.read(x);
         memory.write(SP, (short) regs[REG_L]);
-        memory.write(SP + 1, (short) regs[REG_H]);
+        memory.write(x, (short) regs[REG_H]);
         regs[REG_L] = tmp & 0xFF;
         regs[REG_H] = tmp1 & 0xFF;
         return 19;
@@ -1794,14 +1795,13 @@ public class EmulatorEngine implements CpuEngine {
         PC = (PC + 1) & 0xFFFF;
 
         int DAR = regs[REG_A];
-        int diff = tmp;
-        regs[REG_A] += diff;
+        regs[REG_A] += tmp;
 
         flags = SIGN_ZERO_CARRY_TABLE[regs[REG_A] & 0x1FF];
         regs[REG_A] = regs[REG_A] & 0xFF;
 
-        auxCarry(DAR, diff);
-        overflow(DAR, diff, regs[REG_A]);
+        auxCarry(DAR, tmp);
+        overflow(DAR, tmp, regs[REG_A]);
 
         return 7;
     }
@@ -2109,7 +2109,7 @@ public class EmulatorEngine implements CpuEngine {
                             } else {
                                 IY = readWord(SP);
                             }
-                            SP += 2;
+                            SP = (SP + 2) & 0xFFFF;
                             return 14;
                         case 0xE3: /* EX (SP),ii */
                             tmp = readWord(SP);
@@ -2123,7 +2123,7 @@ public class EmulatorEngine implements CpuEngine {
                             writeWord(SP, tmp1);
                             return 23;
                         case 0xE5: /* PUSH ii */
-                            SP -= 2;
+                            SP = (SP - 2) & 0xFFFF;
                             if (special == 0xDD) {
                                 writeWord(SP, IX);
                             } else {

@@ -29,45 +29,62 @@ import java.util.List;
 import java.util.Objects;
 
 public class RawDisc implements AutoCloseable {
-    public final static int SECTOR_SIZE = 137;
-    public final static int SECTORS_COUNT = 32; // 26, 32
+    public final static int SECTOR_SIZE = 128; //137;
+    public final static int SECTORS_PER_TRACK = 32; // 26, 32
     public final static int SECTOR_SKEW = 17;
     public final static int BLOCK_LENGTH = 1024; // 2048, 4096, 8192 and 16384
+    //public final static int TRACKS_COUNT = 77;
+    public final static int DIRECTORY_TRACK = 6;
+    private final static int RAW_CHECKSUM_LENGTH = 9;
 
-    private final TrackAndSector position = new TrackAndSector(0, 0);
+    private final Position position = new Position(0, 0);
     private final FileChannel channel;
 
+    private final int[] skewTab;
+    private final int rawSectorSize;
     private final int sectorSize;
-    private final int sectorsCount;
-    private final int sectorSkew;
+    private final int sectorsPerTrack;
     private final int blockLength;
+    private final int directoryTrack;
 
-    public RawDisc(Path imageFile, int sectorSize, int sectorsCount, int sectorSkew, int blockLength, OpenOption... openOptions) throws IOException {
+    public RawDisc(Path imageFile, int sectorSize, int sectorsPerTrack, int sectorSkew, int blockLength,
+                   int directoryTrack, OpenOption... openOptions) throws IOException {
+        this.rawSectorSize = sectorSize + RAW_CHECKSUM_LENGTH;
         this.sectorSize = sectorSize;
-        this.sectorsCount = sectorsCount;
-        this.sectorSkew = sectorSkew;
         this.blockLength = blockLength;
+        this.sectorsPerTrack = sectorsPerTrack;
+        this.skewTab = new int[sectorsPerTrack];
+        this.directoryTrack = directoryTrack;
+
+        int currentSkew = 0;
+        for (int i = 0; i < sectorsPerTrack; i++) {
+            while (true) {
+                int k = 0;
+                while (k < i && skewTab[k] != currentSkew) {
+                    k++;
+                }
+                if (k < i) {
+                    currentSkew = (currentSkew + 1) % sectorsPerTrack;
+                } else {
+                    break;
+                }
+            }
+            skewTab[i] = currentSkew;
+            currentSkew = (currentSkew + sectorSkew) % sectorsPerTrack;
+        }
+
         this.channel = FileChannel.open(Objects.requireNonNull(imageFile), openOptions);
     }
 
-    public void reset() {
-        reset(0, 0);
+    private void reset(int track, int sector) {
+        position.reset(track, sector);
     }
 
-    public void reset(int track) {
-        reset(track, 0);
-    }
+    private ByteBuffer readSector() throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(rawSectorSize);
 
-    public void reset(int track, int sector) {
-        position.track = track;
-        position.sector = sector;
-    }
-
-    public ByteBuffer readSector() throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocateDirect(sectorSize);
-
-        channel.position(sectorsCount * sectorSize * position.track + sectorSize * position.sector);
-        if (channel.read(buffer) != sectorSize) {
+        channel.position(sectorsPerTrack * rawSectorSize * position.track + rawSectorSize * skewTab[position.sector]);
+        if (channel.read(buffer) != rawSectorSize) {
             throw new IOException("Could not read whole sector! (" + position + ")");
         }
 
@@ -75,28 +92,29 @@ public class RawDisc implements AutoCloseable {
         return buffer.asReadOnlyBuffer();
     }
 
-    public void writeSector(ByteBuffer buffer) throws IOException {
-        channel.position(sectorsCount * sectorSize * position.track + sectorSize * position.sector);
+//    public void writeSector(ByteBuffer buffer) throws IOException {
+//        channel.position(sectorsPerTrack * rawSectorSize * position.track + rawSectorSize * skewTab[position.sector]);
+//
+//        int expected = buffer.remaining();
+//        if (channel.write(buffer) != expected) {
+//            throw new IOException("Could not write whole sector! (" + position + ")");
+//        }
+//    }
 
-        int expected = buffer.remaining();
-        if (channel.write(buffer) != expected) {
-            throw new IOException("Could not write whole sector! (" + position + ")");
-        }
-    }
+    List<ByteBuffer> readBlock(int blockNumber) throws IOException {
+        int sectorsPerBlock = blockLength / sectorSize;
+        final int sector = (blockNumber * sectorsPerBlock + sectorsPerTrack * directoryTrack) % sectorsPerTrack;
+        int track = (blockNumber * sectorsPerBlock + sectorsPerTrack * directoryTrack) / sectorsPerTrack;
 
-    public List<ByteBuffer> readBlock() throws IOException {
-        int numberOfSectors = blockLength / sectorSize;
-
+        reset(track, sector);
         List<ByteBuffer> block = new ArrayList<>();
-        for (int i = 0; i < numberOfSectors; i++) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(sectorSize);
-
-            channel.position(sectorsCount * sectorSize * position.track + sectorSize * position.sector);
-            channel.read(buffer);
-            buffer.flip();
-            block.add(buffer.asReadOnlyBuffer());
-
-            position.sector = (position.sector + sectorSkew) % sectorsCount;
+        for (int counter = 0; counter < sectorsPerBlock; counter++) {
+            block.add(readSector());
+            position.sector++;
+            if (position.sector >= sectorsPerTrack) {
+                reset(track + 1, 0);
+                track++;
+            }
         }
         return block;
     }
@@ -105,4 +123,5 @@ public class RawDisc implements AutoCloseable {
     public void close() throws Exception {
         channel.close();
     }
+
 }

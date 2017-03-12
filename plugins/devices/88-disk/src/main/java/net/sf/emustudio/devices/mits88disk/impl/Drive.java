@@ -196,7 +196,8 @@ public class Drive {
 
     public void mount(File file) throws IOException {
         if (!file.isFile() || !file.exists()) {
-            throw new IllegalArgumentException("[drive=" + index + "] Specified file name doesn't point to a file");
+            LOGGER.error("[drive={},file={}] Specified file name doesn't point to existing file", index, file);
+            return;
         }
         umount();
         this.mountedFloppy = file;
@@ -217,7 +218,7 @@ public class Drive {
                 imageChannel.close();
             }
         } catch (IOException e) {
-            LOGGER.error("[drive=" + index + "] Could not umount disk image", e);
+            LOGGER.error("[drive={}] Could not un-mount disk image", index, e);
         }
     }
 
@@ -236,9 +237,6 @@ public class Drive {
     public void writeToPort2(short val) {
         if ((val & 0x01) != 0) { /* Step head in */
             track++;
-            if (track == 77) {
-                track = 0;
-            }
             sector = 0;
             sectorOffset = 0;
         }
@@ -307,7 +305,7 @@ public class Drive {
             return 0;
         }
 //        LOGGER.info("[T={}, S={}, O={}, imagePos={}] Reading", track, sector, sectorOffset,
-//            sectorsCount * sectorLength * track + sectorLength * sector + sectorOffset
+//            sectorsPerTrack * sectorLength * track + sectorLength * sector + sectorOffset
 //        );
         imageChannel.position(sectorsCount * sectorLength * track + sectorLength * sector + sectorOffset);
         try {
