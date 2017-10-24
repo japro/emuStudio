@@ -30,9 +30,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import static emustudio.architecture.ComputerConfigTest.getBaseDirectory;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ConfigurationImplTest {
 
@@ -61,11 +59,11 @@ public class ConfigurationImplTest {
         assertEquals(configName, result.getConfigName());
         assertNotNull(result.getCompilerElement());
         assertNotNull(result.getCpuElement());
-        assertNotNull(result.getMemoryElement());
+        assertFalse(result.getMemoryElements().isEmpty());
         assertEquals(1, result.getDeviceElements().size());
         assertEquals("brainc-brainduck-0.15.1-SNAPSHOT", result.getCompilerElement().getPluginName());
         assertEquals("brainduck-cpu-0.14.1-SNAPSHOT", result.getCpuElement().getPluginName());
-        assertEquals("brainduck-mem-0.12.1-SNAPSHOT", result.getMemoryElement().getPluginName());
+        assertEquals("brainduck-mem-0.12.1-SNAPSHOT", result.getMemoryElements().get(0).getPluginName());
         assertEquals("terminal-brainduck-0.13.1-SNAPSHOT", result.getDeviceElements().get(0).getPluginName());
         assertEquals(20, result.getGridGap());
         assertTrue(result.isGridUsed());

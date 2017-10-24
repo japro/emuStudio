@@ -38,7 +38,7 @@ public class Schema {
 
     private CompilerElement compilerElement;
     private CpuElement cpuElement;
-    private MemoryElement memoryElement;
+    private List<MemoryElement> memoryElements;
     private List<DeviceElement> deviceElements;
     private List<ConnectionLine> lines;
     private final Properties settings;
@@ -55,7 +55,7 @@ public class Schema {
 
     public Schema() {
         cpuElement = null;
-        memoryElement = null;
+        memoryElements = new ArrayList<>();
         deviceElements = new ArrayList<>();
         lines = new ArrayList<>();
         configName = "";
@@ -67,6 +67,7 @@ public class Schema {
 
     private void loadFromSettings() throws NumberFormatException, NullPointerException {
         this.deviceElements = new ArrayList<>();
+        this.memoryElements = new ArrayList<>();
         this.lines = new ArrayList<>();
 
         // grid
@@ -78,7 +79,16 @@ public class Schema {
         // if cpu is null here, it does not matter. Maybe user just did not
         // finish the schema..
         cpuElement = new CpuElement(settings.getProperty("cpu"), selectSettings("cpu"), this);
-        memoryElement = new MemoryElement(settings.getProperty("memory"), selectSettings("memory"), this);
+        //if we have only one memory, the key can also be "memory" without an index
+        if (settings.containsKey("memory")) {
+            memoryElements.add(new MemoryElement(settings.getProperty("memory"), selectSettings("memory"), this));
+        }
+
+        //if we have more memories, load them all by the index
+        for (int i = 0; settings.containsKey("memory" + i); i++) {
+            memoryElements.add(new MemoryElement(settings.getProperty("memory" + i), selectSettings("memory" + i), this));
+        }
+
         // load devices
         for (int i = 0; settings.containsKey("device" + i); i++) {
             deviceElements.add(new DeviceElement(settings.getProperty("device" + i), selectSettings("device" + i), this));
@@ -113,12 +123,17 @@ public class Schema {
         if (endpoint.equals("cpu")) {
             return cpuElement;
         } else if (endpoint.equals("memory")) {
-            return memoryElement;
-        } else if (endpoint.equals("compiler")) {
-            return compilerElement;
-        } else if (endpoint.startsWith("device")) {
-            int index = Integer.parseInt(endpoint.substring(6));
-            return deviceElements.get(index);
+            return memoryElements.get(0);
+        } else {
+            if (endpoint.startsWith("memory")) {
+                int index = Integer.parseInt(endpoint.substring(6));
+                return memoryElements.get(index);
+            } else if (endpoint.equals("compiler")) {
+                return compilerElement;
+            } else if (endpoint.startsWith("device")) {
+                int index = Integer.parseInt(endpoint.substring(6));
+                return deviceElements.get(index);
+            }
         }
         return null;
     }
@@ -126,7 +141,7 @@ public class Schema {
     void destroy() {
         cpuElement = null;
         compilerElement = null;
-        memoryElement = null;
+        memoryElements.clear();
         deviceElements.clear();
         lines.clear();
         configName = "";
@@ -193,17 +208,20 @@ public class Schema {
         return cpuElement;
     }
 
-    public void setMemoryElement(MemoryElement memoryElement) {
-        if ((memoryElement == null) && (this.memoryElement != null)) {
-            removeIncidentLines(this.memoryElement);
-        } else if (this.memoryElement != null) {
-            updateIncidentLines(this.memoryElement, memoryElement);
+    public void addMemoryElement(MemoryElement memoryElement) {
+        if (memoryElement == null) {
+            return;
         }
-        this.memoryElement = memoryElement;
+        memoryElements.add(memoryElement);
     }
 
-    public MemoryElement getMemoryElement() {
-        return memoryElement;
+    public List<MemoryElement> getMemoryElements() {
+        return memoryElements;
+    }
+
+    void removeMemoryElement(MemoryElement memoryElement) {
+        removeIncidentLines(memoryElement);
+        memoryElements.remove(memoryElement);
     }
 
     public void addDeviceElement(DeviceElement deviceElement) {
@@ -228,7 +246,7 @@ public class Schema {
         } else if (elem instanceof CpuElement) {
             setCpuElement(null);
         } else if (elem instanceof MemoryElement) {
-            setMemoryElement(null);
+            removeMemoryElement((MemoryElement) elem);
         } else if (elem instanceof DeviceElement) {
             removeDeviceElement((DeviceElement) elem);
         }
@@ -239,9 +257,7 @@ public class Schema {
         if (cpuElement != null) {
             a.add(cpuElement);
         }
-        if (memoryElement != null) {
-            a.add(memoryElement);
-        }
+        a.addAll(memoryElements);
         if (compilerElement != null) {
             a.add(compilerElement);
         }
@@ -557,9 +573,13 @@ public class Schema {
         if (cpuElement != null) {
             cpuElement.saveProperties(settings, "cpu");
         }
-        // memory
-        if (memoryElement != null) {
-            memoryElement.saveProperties(settings, "memory");
+        // memories
+        Map<MemoryElement, String> memoriesHash = new HashMap<>();
+        int memoriesCount = memoryElements.size();
+        for(int i=0; i<memoriesCount; i++) {
+            MemoryElement memoryElement = memoryElements.get(i);
+            memoriesHash.put(memoryElement, "memory" + i);
+            memoryElement.saveProperties(settings, "memory" + i);
         }
         // devices
         Map<DeviceElement, String> devsHash = new HashMap<>();
@@ -581,7 +601,7 @@ public class Schema {
             } else if (e instanceof CpuElement) {
                 settings.put("connection" + i + ".junc0", "cpu");
             } else if (e instanceof MemoryElement) {
-                settings.put("connection" + i + ".junc0", "memory");
+                settings.put("connection" + i + ".junc0", memoriesHash.get(e));
             } else if (e instanceof DeviceElement) {
                 settings.put("connection" + i + ".junc0", devsHash.get(e));
             }
@@ -592,7 +612,7 @@ public class Schema {
             } else if (e instanceof CpuElement) {
                 settings.put("connection" + i + ".junc1", "cpu");
             } else if (e instanceof MemoryElement) {
-                settings.put("connection" + i + ".junc1", "memory");
+                settings.put("connection" + i + ".junc1", memoriesHash.get(e));
             } else if (e instanceof DeviceElement) {
                 settings.put("connection" + i + ".junc1", devsHash.get(e));
             }

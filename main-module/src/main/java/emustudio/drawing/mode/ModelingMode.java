@@ -145,7 +145,7 @@ class ModelingMode extends AbstractMode {
             panel.fireToolWasUsed();
         } else if (model.drawTool == Tool.memory) {
             p.setLocation(searchGridPoint(p));
-            schema.setMemoryElement(new MemoryElement(model.newPluginName, p, schema));
+            schema.addMemoryElement(new MemoryElement(model.newPluginName, p, schema));
             panel.fireToolWasUsed();
         } else if (model.drawTool == Tool.device) {
             p.setLocation(searchGridPoint(p));

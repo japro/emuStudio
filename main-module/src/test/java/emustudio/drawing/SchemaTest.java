@@ -84,11 +84,46 @@ public class SchemaTest {
     }
 
     @Test
-    public void testGetMemoryElement() {
+    public void testAddMemoryElement() {
+        MemoryElement memoryElement;
         Schema schema = new Schema();
-        MemoryElement memory = new MemoryElement("mem", new Properties(), schema);
-        schema.setMemoryElement(memory);
-        Assert.assertSame(memory, schema.getMemoryElement());
+        schema.addMemoryElement(null);
+        Assert.assertEquals(0, schema.getMemoryElements().size());
+
+        for (int i = 0; i < 10; i++) {
+            memoryElement = new MemoryElement("mem-" + i, new Properties(), schema);
+            schema.addMemoryElement(memoryElement);
+            Assert.assertEquals(i + 1, schema.getMemoryElements().size());
+        }
+    }
+
+
+    @Test
+    public void testGetMemoryElements() {
+        Schema schema = new Schema();
+        MemoryElement memoryElement = new MemoryElement("mem-0", new Properties(), schema);
+        schema.addMemoryElement(memoryElement);
+        memoryElement = new MemoryElement("mem-1", new Properties(), schema);
+        schema.addMemoryElement(memoryElement);
+        memoryElement = new MemoryElement("mem-2", new Properties(), schema);
+        schema.addMemoryElement(memoryElement);
+
+
+        List<MemoryElement> result = schema.getMemoryElements();
+        Assert.assertEquals(3, result.size());
+        Assert.assertEquals("mem-0", result.get(0).getPluginName());
+        Assert.assertEquals("mem-1", result.get(1).getPluginName());
+        Assert.assertEquals("mem-2", result.get(2).getPluginName());
+    }
+
+    @Test
+    public void testRemoveMemoryElement() {
+        Schema schema = new Schema();
+        MemoryElement memory = new MemoryElement("mem-0", new Properties(), schema);
+        schema.addMemoryElement(memory);
+        Assert.assertEquals(1, schema.getMemoryElements().size());
+        schema.removeMemoryElement(memory);
+        Assert.assertEquals(0, schema.getMemoryElements().size());
     }
 
     @Test
@@ -173,7 +208,7 @@ public class SchemaTest {
 
         schema.setCompilerElement(compiler);
         schema.addDeviceElement(device);
-        schema.setMemoryElement(memory);
+        schema.addMemoryElement(memory);
 
         ConnectionLine lin0 = new ConnectionLine(compiler, device, new ArrayList<>(), schema);
         ConnectionLine lin1 = new ConnectionLine(compiler, memory, new ArrayList<>(), schema);
@@ -426,8 +461,10 @@ public class SchemaTest {
         schema.destroy();
         Assert.assertEquals(0, schema.getAllElements().size());
         Assert.assertNull(schema.getCompilerElement());
-        Assert.assertNull(schema.getMemoryElement());
+        Assert.assertTrue(schema.getMemoryElements().isEmpty());
+        Assert.assertTrue(schema.getDeviceElements().isEmpty());
         Assert.assertNull(schema.getCpuElement());
+
         Assert.assertEquals(0, schema.getConnectionLines().size());
 
     }
@@ -774,7 +811,7 @@ public class SchemaTest {
         Assert.assertEquals(2, schema.getAllElements().size());
         Assert.assertSame(line1, schema.getConnectionLines().get(0));
         Assert.assertSame(compiler, schema.getCompilerElement());
-        Assert.assertNull(schema.getMemoryElement());
+        Assert.assertTrue(schema.getMemoryElements().isEmpty());
         Assert.assertSame(device, schema.getDeviceElements().get(0));
     }
 
@@ -818,7 +855,7 @@ public class SchemaTest {
         Properties props = mockProperties("memory", x, y, width, height);
         MemoryElement memory = new MemoryElement("memory", props, instance);
         memory.measure(graphicsMock);
-        instance.setMemoryElement(memory);
+        instance.addMemoryElement(memory);
         return memory;
     }
 
