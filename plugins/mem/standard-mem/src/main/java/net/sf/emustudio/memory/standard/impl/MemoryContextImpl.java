@@ -42,6 +42,8 @@ public class MemoryContextImpl extends AbstractMemoryContext<Short> implements S
     private int banksCount;
     private short bankSelect = 0;
     private int bankCommon = 0;
+    private CellSize cellSize = CellSize.BYTE;
+    private Endian endian = Endian.LITTLE;
 
     void init(int size, int banks, int bankCommon) {
         if (banks <= 0) {
@@ -234,5 +236,21 @@ public class MemoryContextImpl extends AbstractMemoryContext<Short> implements S
     @Override
     public Class<?> getDataType() {
         return Short.class;
+    }
+
+    @Override
+    public void setupCellInGUI(CellSize cellSize, Endian endian) {
+        this.cellSize = cellSize;
+        this.endian = endian;
+    }
+
+    @Override
+    public CellSize getCellSize() {
+        return cellSize;
+    }
+
+    @Override
+    public Endian getEndian() {
+        return endian;
     }
 }

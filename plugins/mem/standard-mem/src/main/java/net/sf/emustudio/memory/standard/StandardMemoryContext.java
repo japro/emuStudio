@@ -31,6 +31,14 @@ import java.util.List;
  */
 @ContextType(id = "Standard memory")
 public interface StandardMemoryContext extends MemoryContext<Short> {
+
+    enum CellSize {
+        BYTE, WORD
+    }
+
+    enum Endian {
+        LITTLE, BIG
+    }
     
     /**
      * This interface represents a range of addresses in the memory.
@@ -117,5 +125,26 @@ public interface StandardMemoryContext extends MemoryContext<Short> {
      * @return true if the file was loaded successfully, false otherwise
      */
     boolean loadBin(String filename, int address, int bank);
+
+    /**
+     * Set size of a memory cell, i.e. how many bytes will be contained i one cell. Internally, memory
+     * is always stored as a sequence of one-byte values. However, this setting modifies the way of representation
+     * in the GUI.
+     * @param cellSize the number of bytes displayed in the GUI as one cell
+     * @param endian the endianness of stored bytes
+     */
+    void setupCellInGUI(CellSize cellSize, Endian endian);
+
+    /**
+     * Get the number of bytes displayed in the GUI as one cell
+     * @return the number of bytes displayed in the GUI as one cell
+     */
+    CellSize getCellSize();
+
+    /**
+     * Get the endianness of stored bytes
+     * @return the endianness of stored bytes
+     */
+    Endian getEndian();
     
 }

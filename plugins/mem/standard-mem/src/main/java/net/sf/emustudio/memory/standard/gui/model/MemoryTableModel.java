@@ -73,21 +73,57 @@ public class MemoryTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-        int pos = ROW_COUNT * COLUMN_COUNT * currentPage + rowIndex * COLUMN_COUNT + columnIndex;
+        int cellByteCount = mem.getCellSize().ordinal() + 1; //number of bytes in one memory cell
+
+        int pos = ROW_COUNT * COLUMN_COUNT * currentPage * cellByteCount + rowIndex * COLUMN_COUNT * cellByteCount + columnIndex * cellByteCount;
         if (pos >= mem.getSize()) {
             return ".";
         }
-        return String.format("%1$02X", mem.read(pos, currentBank));
+        switch (mem.getCellSize()) {
+            case BYTE:
+                return String.format("%02X", mem.read(pos, currentBank));
+            case WORD:
+                short leastSignificantByte = mem.read(pos, currentBank);
+                short mostSignificantByte = mem.read(pos + 1, currentBank);
+                switch (mem.getEndian()) {
+                    case LITTLE:
+                        return String.format("%02X%02X", mostSignificantByte, leastSignificantByte);
+                    case BIG:
+                        return String.format("%02X%02X", leastSignificantByte, mostSignificantByte);
+                }
+        }
+        return "."; //should never happen
     }
 
     @Override
     public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-        int pos = ROW_COUNT * COLUMN_COUNT * currentPage + rowIndex * COLUMN_COUNT + columnIndex;
-        try {
-            mem.write(pos, Short.decode(String.valueOf(aValue)), currentBank);
-            fireTableCellUpdated(rowIndex, columnIndex);
-        } catch (NumberFormatException e) {
-            // ignored
+        int cellByteCount = mem.getCellSize().ordinal() + 1; //number of bytes in one memory cell
+
+        int pos = ROW_COUNT * COLUMN_COUNT * currentPage * cellByteCount + rowIndex * COLUMN_COUNT * cellByteCount + columnIndex * cellByteCount;
+
+        switch (mem.getCellSize()) {
+            case BYTE:
+                try {
+                    mem.write(pos, Short.decode(String.valueOf(aValue)), currentBank);
+                    fireTableCellUpdated(rowIndex, columnIndex);
+                } catch (NumberFormatException e) {
+                    // ignored
+                }
+                break;
+            case WORD:
+                short leastSignificantByte = Short.parseShort(String.valueOf(aValue).substring(4, 6), 16);
+                short mostSignificantByte = Short.parseShort(String.valueOf(aValue).substring(2, 4), 16);
+                switch (mem.getEndian()) {
+                    case LITTLE:
+                        mem.write(pos, leastSignificantByte);
+                        mem.write(pos + 1, mostSignificantByte);
+                        break;
+                    case BIG:
+                        mem.write(pos, mostSignificantByte);
+                        mem.write(pos + 1, leastSignificantByte);
+                        break;
+                }
+                break;
         }
     }
 
