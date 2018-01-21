@@ -101,29 +101,29 @@ public class MemoryTableModel extends AbstractTableModel {
 
         int pos = ROW_COUNT * COLUMN_COUNT * currentPage * cellByteCount + rowIndex * COLUMN_COUNT * cellByteCount + columnIndex * cellByteCount;
 
-        switch (mem.getCellSize()) {
-            case BYTE:
-                try {
+        try {
+            switch (mem.getCellSize()) {
+                case BYTE:
                     mem.write(pos, Short.decode(String.valueOf(aValue)), currentBank);
-                    fireTableCellUpdated(rowIndex, columnIndex);
-                } catch (NumberFormatException e) {
-                    // ignored
-                }
-                break;
-            case WORD:
-                short leastSignificantByte = Short.parseShort(String.valueOf(aValue).substring(4, 6), 16);
-                short mostSignificantByte = Short.parseShort(String.valueOf(aValue).substring(2, 4), 16);
-                switch (mem.getEndian()) {
-                    case LITTLE:
-                        mem.write(pos, leastSignificantByte);
-                        mem.write(pos + 1, mostSignificantByte);
-                        break;
-                    case BIG:
-                        mem.write(pos, mostSignificantByte);
-                        mem.write(pos + 1, leastSignificantByte);
-                        break;
-                }
-                break;
+                    break;
+                case WORD:
+                    short leastSignificantByte = Short.parseShort(String.valueOf(aValue).substring(4, 6), 16);
+                    short mostSignificantByte = Short.parseShort(String.valueOf(aValue).substring(2, 4), 16);
+                    switch (mem.getEndian()) {
+                        case LITTLE:
+                            mem.write(pos, leastSignificantByte, currentBank);
+                            mem.write(pos + 1, mostSignificantByte, currentBank);
+                            break;
+                        case BIG:
+                            mem.write(pos, mostSignificantByte, currentBank);
+                            mem.write(pos + 1, leastSignificantByte, currentBank);
+                            break;
+                    }
+                    break;
+            }
+            fireTableCellUpdated(rowIndex, columnIndex);
+        } catch (NumberFormatException e) {
+            // ignored
         }
     }
 
@@ -179,3 +179,4 @@ public class MemoryTableModel extends AbstractTableModel {
         return currentBank;
     }
 }
+
